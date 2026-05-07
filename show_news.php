@@ -4,6 +4,7 @@
 header('Content-Type: text/html; charset=utf-8');
 require 'db_config.php';
 
+$currentUser = current_user();
 $newsId = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($newsId <= 0) {
@@ -12,7 +13,7 @@ if ($newsId <= 0) {
 
 // Fetch news content
 try {
-    $stmt = $pdo->prepare('SELECT id, title, content, author, created_at FROM news WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, title, content, author, author_avatar, author_color, created_at FROM news WHERE id = ?');
     $stmt->execute([$newsId]);
     $news = $stmt->fetch();
 
@@ -26,7 +27,7 @@ try {
 // Fetch replies
 try {
     $stmt = $pdo->prepare('
-        SELECT id, content, author, created_at 
+        SELECT id, content, author, author_avatar, author_color, created_at 
         FROM replies 
         WHERE news_id = ? 
         ORDER BY created_at ASC
@@ -132,7 +133,6 @@ try {
             font-weight: bold;
             color: #333;
         }
-        input[type="text"],
         textarea {
             width: 100%;
             padding: 10px;
@@ -140,8 +140,6 @@ try {
             border-radius: 4px;
             font-family: inherit;
             box-sizing: border-box;
-        }
-        textarea {
             resize: vertical;
             min-height: 100px;
         }
@@ -169,6 +167,9 @@ try {
             padding-bottom: 8px;
             margin-bottom: 20px;
         }
+        .author-avatar {
+            margin-left: 6px;
+        }
     </style>
 </head>
 <body>
@@ -178,8 +179,9 @@ try {
         <div class="news-content">
             <div class="news-title"><?= escape($news['title']) ?></div>
             <div class="news-meta">
-                由 <strong><?= escape($news['author']) ?></strong> 發表於
-                <?= escape($news['created_at']) ?>
+                由 <strong><?= escape($news['author']) ?></strong>
+                <span class="author-avatar"><?= escape($news['author_avatar']) ?></span>
+                發表於 <?= escape($news['created_at']) ?>
             </div>
             <div class="news-body"><?= escape($news['content']) ?></div>
         </div>
@@ -191,12 +193,11 @@ try {
                 <p class="empty">目前沒有回應。</p>
             <?php else: ?>
                 <?php foreach ($replies as $reply): ?>
-                    <div class="reply-item">
+                    <?php $replyColor = member_color_hex($reply['author_color'] ?? ''); ?>
+                    <div class="reply-item" style="background: <?= escape($replyColor) ?>22; border-left-color: <?= escape($replyColor) ?>;">
                         <div class="reply-author">
-                            <?= escape($reply['author']) ?>
-                            <span class="reply-time">
-                                - <?= escape($reply['created_at']) ?>
-                            </span>
+                            <?= escape($reply['author']) ?> <?= escape($reply['author_avatar']) ?>
+                            <span class="reply-time">- <?= escape($reply['created_at']) ?></span>
                         </div>
                         <div class="reply-content">
                             <?= escape($reply['content']) ?>
@@ -208,21 +209,22 @@ try {
 
         <div class="form-box">
             <h2>發表回應</h2>
-            <form action="post_reply.php" method="post">
-                <input type="hidden" name="news_id" value="<?= $newsId ?>">
-
-                <div class="form-group">
-                    <label for="author">作者：</label>
-                    <input type="text" id="author" name="author" maxlength="100" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="content">回應內容：</label>
-                    <textarea id="content" name="content" required></textarea>
-                </div>
-
-                <button type="submit">送出回應</button>
-            </form>
+            <?php if ($currentUser): ?>
+                <form action="post_reply.php" method="post">
+                    <input type="hidden" name="news_id" value="<?= $newsId ?>">
+                    <div class="form-group">
+                        <label>作者：</label>
+                        <div><?= escape($currentUser['nickname']) ?> <?= escape($currentUser['avatar']) ?></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="content">回應內容：</label>
+                        <textarea id="content" name="content" required></textarea>
+                    </div>
+                    <button type="submit">送出回應</button>
+                </form>
+            <?php else: ?>
+                <p>請先 <a href="login.php">登入</a> 或 <a href="register.php">註冊</a>，才能發表回應。</p>
+            <?php endif; ?>
         </div>
     </div>
 </body>
