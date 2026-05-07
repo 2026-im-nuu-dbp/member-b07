@@ -4,14 +4,16 @@
 header('Content-Type: text/html; charset=utf-8');
 require 'db_config.php';
 
+$currentUser = current_user();
+
 // Fetch all news topics with reply count
 try {
     $stmt = $pdo->query('
-        SELECT n.id, n.title, n.author, n.created_at,
+        SELECT n.id, n.title, n.author, n.author_avatar, n.author_color, n.created_at,
                COUNT(r.id) as reply_count
         FROM news n
         LEFT JOIN replies r ON n.id = r.news_id
-        GROUP BY n.id, n.title, n.author, n.created_at
+        GROUP BY n.id, n.title, n.author, n.author_avatar, n.author_color, n.created_at
         ORDER BY n.created_at DESC
     ');
     $news = $stmt->fetchAll();
@@ -36,10 +38,25 @@ try {
             max-width: 900px;
             margin: 0 auto;
         }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #007bff;
+            text-decoration: none;
+            margin-left: 16px;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
         h1 {
             color: #333;
             border-bottom: 3px solid #007bff;
             padding-bottom: 10px;
+            margin: 0;
         }
         .form-box {
             background: #fff;
@@ -113,6 +130,9 @@ try {
             font-size: 14px;
             color: #666;
         }
+        .author-avatar {
+            margin-left: 6px;
+        }
         .reply-count {
             display: inline-block;
             background: #28a745;
@@ -139,7 +159,21 @@ try {
 </head>
 <body>
     <div class="container">
-        <h1>📋 討論區</h1>
+        <div class="nav">
+            <h1>📋 討論區</h1>
+            <div>
+                <?php if ($currentUser): ?>
+                    歡迎 <?= escape($currentUser['nickname']) ?> <?= escape($currentUser['avatar']) ?>
+                    <?php if ($currentUser['is_admin']): ?>
+                        <a href="admin_users.php">管理會員</a>
+                    <?php endif; ?>
+                    <a href="logout.php">登出</a>
+                <?php else: ?>
+                    <a href="login.php">登入</a>
+                    <a href="register.php">註冊</a>
+                <?php endif; ?>
+            </div>
+        </div>
 
         <?php if (isset($error)): ?>
             <div class="error"><?= escape($error) ?></div>
@@ -147,24 +181,28 @@ try {
 
         <div class="form-box">
             <h2>發表新討論</h2>
-            <form action="post.php" method="post">
-                <div class="form-group">
-                    <label for="author">作者：</label>
-                    <input type="text" id="author" name="author" maxlength="100" required>
-                </div>
+            <?php if ($currentUser): ?>
+                <form action="post.php" method="post">
+                    <div class="form-group">
+                        <label>作者：</label>
+                        <div><?= escape($currentUser['nickname']) ?> <?= escape($currentUser['avatar']) ?></div>
+                    </div>
 
-                <div class="form-group">
-                    <label for="title">標題：</label>
-                    <input type="text" id="title" name="title" maxlength="200" required>
-                </div>
+                    <div class="form-group">
+                        <label for="title">標題：</label>
+                        <input type="text" id="title" name="title" maxlength="200" required>
+                    </div>
 
-                <div class="form-group">
-                    <label for="content">內容：</label>
-                    <textarea id="content" name="content" required></textarea>
-                </div>
+                    <div class="form-group">
+                        <label for="content">內容：</label>
+                        <textarea id="content" name="content" required></textarea>
+                    </div>
 
-                <button type="submit">發表討論</button>
-            </form>
+                    <button type="submit">發表討論</button>
+                </form>
+            <?php else: ?>
+                <p>請先 <a href="login.php">登入</a> 或 <a href="register.php">註冊</a>，才能發表討論。</p>
+            <?php endif; ?>
         </div>
 
         <h2>討論列表</h2>
@@ -188,8 +226,9 @@ try {
                             <?php endif; ?>
                         </div>
                         <div class="news-meta">
-                            由 <strong><?= escape($item['author']) ?></strong> 發表於
-                            <?= escape($item['created_at']) ?>
+                            由 <strong><?= escape($item['author']) ?></strong>
+                            <span class="author-avatar"><?= escape($item['author_avatar']) ?></span>
+                            發表於 <?= escape($item['created_at']) ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
